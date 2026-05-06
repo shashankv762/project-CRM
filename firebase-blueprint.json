@@ -1,0 +1,122 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "System user (sales rep)",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["email", "name", "role", "createdAt"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Customer record",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "company": { "type": "string" },
+        "status": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["name", "email", "status", "ownerId", "createdAt", "updatedAt"]
+    },
+    "Lead": {
+      "title": "Lead",
+      "description": "A potential customer or prospect",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "source": { "type": "string" },
+        "status": { "type": "string", "enum": ["new", "qualified", "contacted", "converted", "lost"] },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["name", "status", "ownerId", "createdAt", "updatedAt"]
+    },
+    "Deal": {
+      "title": "Deal",
+      "description": "Pipeline deal opportunity",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "customerId": { "type": "string" },
+        "value": { "type": "number" },
+        "stage": { "type": "string", "enum": ["prospect", "proposal", "negotiation", "closed_won", "closed_lost"] },
+        "probability": { "type": "number" },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["title", "value", "stage", "ownerId", "createdAt", "updatedAt"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "Task or reminder",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "dueDate": { "type": "number" },
+        "type": { "type": "string", "enum": ["call", "email", "meeting", "todo"] },
+        "status": { "type": "string", "enum": ["pending", "completed"] },
+        "relatedId": { "type": "string" },
+        "relatedType": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["title", "dueDate", "type", "status", "ownerId", "createdAt", "updatedAt"]
+    },
+    "Activity": {
+      "title": "Activity",
+      "description": "Interaction log",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["call", "email", "meeting", "note"] },
+        "summary": { "type": "string" },
+        "relatedId": { "type": "string" },
+        "relatedType": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["type", "summary", "ownerId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "App users"
+    },
+    "/customers/{customerId}": {
+      "schema": { "$ref": "#/entities/Customer" },
+      "description": "Customer list"
+    },
+    "/leads/{leadId}": {
+      "schema": { "$ref": "#/entities/Lead" },
+      "description": "Leads list"
+    },
+    "/deals/{dealId}": {
+      "schema": { "$ref": "#/entities/Deal" },
+      "description": "Deals pipeline"
+    },
+    "/tasks/{taskId}": {
+      "schema": { "$ref": "#/entities/Task" },
+      "description": "User tasks"
+    },
+    "/activities/{activityId}": {
+      "schema": { "$ref": "#/entities/Activity" },
+      "description": "Interaction timeline"
+    }
+  }
+}

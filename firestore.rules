@@ -1,0 +1,164 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Primitive Definitions
+    function isValidId(id) { 
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { return request.auth != null; }
+
+    // User Model
+    function isValidUser(data) {
+      let keysObj = data.keys();
+      let hasRequired = keysObj.hasAll(['email', 'name', 'role', 'createdAt']);
+      let hasOnlyAllowed = keysObj.size() <= 4;
+      return hasRequired && hasOnlyAllowed
+        && data.email is string && data.email.size() <= 128
+        && data.name is string && data.name.size() <= 128
+        && data.role is string && data.role in ['admin', 'rep']
+        && data.createdAt is number;
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() 
+        && request.auth.uid == userId 
+        && isValidId(userId)
+        && isValidUser(incoming());
+      allow update: if isSignedIn() 
+        && request.auth.uid == userId 
+        && isValidUser(incoming())
+        && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'role', 'email']);
+    }
+
+    // Customer Model
+    function isValidCustomer(data) {
+      return data.name is string && data.name.size() <= 128
+        && (!data.keys().hasAll(['email']) || (data.email is string && data.email.size() <= 128))
+        && (!data.keys().hasAll(['phone']) || data.phone is string)
+        && (!data.keys().hasAll(['company']) || data.company is string)
+        && data.status is string && data.status in ['active', 'inactive']
+        && data.ownerId is string && data.ownerId == request.auth.uid
+        && data.createdAt is number
+        && data.updatedAt is number;
+    }
+
+    match /customers/{customerId} {
+      allow read: if isSignedIn() && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() 
+        && isValidId(customerId)
+        && isValidCustomer(incoming())
+         && incoming().keys().size() >= 4;
+      allow update: if isSignedIn() 
+        && existing().ownerId == request.auth.uid
+        && isValidCustomer(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'email', 'phone', 'company', 'status', 'updatedAt']);
+      allow delete: if isSignedIn() && existing().ownerId == request.auth.uid;
+    }
+
+    // Lead Model
+    function isValidLead(data) {
+      return data.name is string && data.name.size() <= 128
+        && (!data.keys().hasAll(['email']) || (data.email is string && data.email.size() <= 128))
+        && (!data.keys().hasAll(['phone']) || data.phone is string)
+        && (!data.keys().hasAll(['company']) || data.company is string)
+        && (!data.keys().hasAll(['source']) || data.source is string)
+        && (!data.keys().hasAll(['lastContacted']) || data.lastContacted is number)
+        && data.status is string && data.status in ['new', 'qualified', 'contacted', 'converted', 'lost']
+        && data.ownerId is string && data.ownerId == request.auth.uid
+        && data.createdAt is number
+        && data.updatedAt is number;
+    }
+
+    match /leads/{leadId} {
+      allow read: if isSignedIn() && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() 
+        && isValidId(leadId)
+        && isValidLead(incoming());
+      allow update: if isSignedIn() 
+        && existing().ownerId == request.auth.uid
+        && isValidLead(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'email', 'phone', 'company', 'source', 'status', 'lastContacted', 'updatedAt']);
+      allow delete: if isSignedIn() && existing().ownerId == request.auth.uid;
+    }
+
+    // Deal Model
+    function isValidDeal(data) {
+      return data.title is string && data.title.size() <= 128
+        && data.value is number
+        && (!data.keys().hasAll(['probability']) || data.probability is number)
+        && data.stage is string && data.stage in ['prospect', 'proposal', 'negotiation', 'closed_won', 'closed_lost']
+        && data.ownerId is string && data.ownerId == request.auth.uid
+        && data.createdAt is number
+        && data.updatedAt is number;
+    }
+
+    match /deals/{dealId} {
+      allow read: if isSignedIn() && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() 
+        && isValidId(dealId)
+        && isValidDeal(incoming());
+      allow update: if isSignedIn() 
+        && existing().ownerId == request.auth.uid
+        && isValidDeal(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'customerId', 'value', 'stage', 'probability', 'updatedAt']);
+      allow delete: if isSignedIn() && existing().ownerId == request.auth.uid;
+    }
+
+    // Task Model
+    function isValidTask(data) {
+      return data.title is string && data.title.size() <= 128
+        && data.dueDate is number
+        && data.type is string && data.type in ['call', 'email', 'meeting', 'todo']
+        && data.status is string && data.status in ['pending', 'completed']
+        && data.ownerId is string && data.ownerId == request.auth.uid
+        && data.createdAt is number
+        && data.updatedAt is number;
+    }
+
+    match /tasks/{taskId} {
+      allow read: if isSignedIn() && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() 
+        && isValidId(taskId)
+        && isValidTask(incoming());
+      allow update: if isSignedIn() 
+        && existing().ownerId == request.auth.uid
+        && isValidTask(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'dueDate', 'type', 'status', 'relatedId', 'relatedType', 'updatedAt']);
+      allow delete: if isSignedIn() && existing().ownerId == request.auth.uid;
+    }
+
+    // Activity Model
+    function isValidActivity(data) {
+      return data.type is string && data.type in ['call', 'email', 'meeting', 'note']
+        && data.summary is string && data.summary.size() <= 1024
+        && data.ownerId is string && data.ownerId == request.auth.uid
+        && data.createdAt is number;
+    }
+
+    match /activities/{activityId} {
+      allow read: if isSignedIn() && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() 
+        && isValidId(activityId)
+        && isValidActivity(incoming());
+      allow delete: if false; // Activities are immutable history logs
+      allow update: if false;
+    }
+  }
+}

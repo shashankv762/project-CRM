@@ -7,11 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Search, Mail, Phone, Plus, MoreHorizontal } from 'lucide-react';
+import { Search, Mail, Phone, Plus, MoreHorizontal, User as UserIcon, Download } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
 import { Label } from '../components/ui/label';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/sheet';
+import { ActivityTimeline } from '../components/ActivityTimeline';
 
 export default function Leads() {
   const { data: leads, loading } = useCRMData('leads');
@@ -19,6 +21,8 @@ export default function Leads() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newLead, setNewLead] = useState({ name: '', email: '', phone: '', company: '', source: '', status: 'new' });
+
+  const [selectedLead, setSelectedLead] = useState<any>(null);
 
   const filteredLeads = leads.filter(l => 
     l.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -62,6 +66,31 @@ export default function Leads() {
     }
   };
 
+  const exportToCSV = () => {
+    const headers = ['Name', 'Email', 'Phone', 'Company', 'Source', 'Status', 'Last Contacted', 'Added Date'];
+    const csvContent = [
+      headers.join(','),
+      ...filteredLeads.map(l => [
+        `"${l.name}"`,
+        `"${l.email || ''}"`,
+        `"${l.phone || ''}"`,
+        `"${l.company || ''}"`,
+        `"${l.source || ''}"`,
+        `"${l.status}"`,
+        `"${l.lastContacted ? new Date(l.lastContacted).toLocaleDateString() : ''}"`,
+        `"${new Date(l.createdAt).toLocaleDateString()}"`
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', 'leads_export.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const statusColors: Record<string, string> = {
     new: 'bg-blue-100 text-blue-700',
     contacted: 'bg-yellow-100 text-yellow-700',
@@ -74,15 +103,19 @@ export default function Leads() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight text-slate-900">Leads</h1>
-        <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-          <DialogTrigger render={<Button className="bg-blue-600 hover:bg-blue-700" />}>
-            <Plus className="mr-2 h-4 w-4" /> Add Lead
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New Lead</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleAddLead} className="space-y-4 pt-4">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" onClick={exportToCSV} disabled={filteredLeads.length === 0}>
+             <Download className="mr-2 h-4 w-4" /> Export CSV
+          </Button>
+          <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+            <DialogTrigger render={<Button className="bg-blue-600 hover:bg-blue-700" />}>
+              <Plus className="mr-2 h-4 w-4" /> Add Lead
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Lead</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleAddLead} className="space-y-4 pt-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Full Name</Label>
                 <Input id="name" required value={newLead.name} onChange={e => setNewLead({...newLead, name: e.target.value})} />
@@ -118,6 +151,7 @@ export default function Leads() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <Card>
@@ -153,7 +187,7 @@ export default function Leads() {
                 <TableRow><TableCell colSpan={6} className="text-center py-8 text-slate-500">No leads found</TableCell></TableRow>
               ) : (
                 filteredLeads.map((lead) => (
-                  <TableRow key={lead.id} className="hover:bg-slate-50">
+                  <TableRow key={lead.id} className="cursor-pointer hover:bg-slate-50" onClick={() => setSelectedLead(lead)}>
                     <TableCell>
                       <div className="font-medium text-slate-900">{lead.name}</div>
                       <div className="text-xs text-slate-500">Added {new Date(lead.createdAt).toLocaleDateString()}</div>
@@ -183,7 +217,7 @@ export default function Leads() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger render={<Button variant="ghost" className="h-8 w-8 p-0" />}>
                           <MoreHorizontal className="h-4 w-4" />
@@ -205,6 +239,58 @@ export default function Leads() {
           </Table>
         </CardContent>
       </Card>
+
+      <Sheet open={!!selectedLead} onOpenChange={(open) => !open && setSelectedLead(null)}>
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+          {selectedLead && (
+            <div className="space-y-6 pb-6">
+              <SheetHeader>
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700">
+                     <UserIcon className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <SheetTitle className="text-xl flex items-center gap-2">
+                      {selectedLead.name}
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${statusColors[selectedLead.status] || statusColors.new}`}>
+                        {selectedLead.status}
+                      </span>
+                    </SheetTitle>
+                    <p className="text-sm text-slate-500 flex gap-2">
+                       {selectedLead.company && <span>{selectedLead.company}</span>}
+                       {selectedLead.company && selectedLead.source && <span>•</span>}
+                       {selectedLead.source && <span>{selectedLead.source}</span>}
+                    </p>
+                  </div>
+                </div>
+              </SheetHeader>
+              
+              <div className="space-y-4">
+                 <div className="p-4 bg-slate-50 rounded-lg space-y-3">
+                   <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">Contact Info</h3>
+                   {selectedLead.email && (
+                     <div className="flex items-center gap-2 text-sm text-slate-700">
+                        <Mail className="h-4 w-4 text-slate-400" />
+                        <a href={`mailto:${selectedLead.email}`} className="text-blue-600 hover:underline">{selectedLead.email}</a>
+                     </div>
+                   )}
+                   {selectedLead.phone && (
+                     <div className="flex items-center gap-2 text-sm text-slate-700">
+                        <Phone className="h-4 w-4 text-slate-400" />
+                        <a href={`tel:${selectedLead.phone}`} className="text-blue-600 hover:underline">{selectedLead.phone}</a>
+                     </div>
+                   )}
+                   {!selectedLead.email && !selectedLead.phone && (
+                     <p className="text-sm text-slate-500 italic">No contact information available.</p>
+                   )}
+                 </div>
+                 
+                 <ActivityTimeline relatedId={selectedLead.id} relatedType="lead" />
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

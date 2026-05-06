@@ -147,6 +147,8 @@ service cloud.firestore {
     function isValidActivity(data) {
       return data.type is string && data.type in ['call', 'email', 'meeting', 'note']
         && data.summary is string && data.summary.size() <= 1024
+        && (!data.keys().hasAll(['relatedId']) || data.relatedId is string)
+        && (!data.keys().hasAll(['relatedType']) || data.relatedType is string)
         && data.ownerId is string && data.ownerId == request.auth.uid
         && data.createdAt is number;
     }

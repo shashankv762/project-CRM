@@ -26,7 +26,7 @@
         "createdAt": { "type": "number" },
         "updatedAt": { "type": "number" }
       },
-      "required": ["name", "email", "status", "ownerId", "createdAt", "updatedAt"]
+      "required": ["name", "status", "ownerId", "createdAt", "updatedAt"]
     },
     "Lead": {
       "title": "Lead",
@@ -36,6 +36,7 @@
         "name": { "type": "string" },
         "email": { "type": "string" },
         "phone": { "type": "string" },
+        "company": { "type": "string" },
         "source": { "type": "string" },
         "status": { "type": "string", "enum": ["new", "qualified", "contacted", "converted", "lost"] },
         "ownerId": { "type": "string" },

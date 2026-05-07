@@ -10,9 +10,20 @@ export function useCRMData(collectionName: string) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user || !currentTenantId) return;
-    
     let isMounted = true;
+
+    if (!user) {
+      if (isMounted) setLoading(false);
+      return;
+    }
+
+    if (!currentTenantId) {
+      if (isMounted) {
+        setData([]);
+        setLoading(false);
+      }
+      return;
+    }
     
     async function fetchData() {
       setLoading(true);

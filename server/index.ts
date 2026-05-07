@@ -6,6 +6,12 @@ import path from "path";
 import authRoutes from './routes/auth.js';
 import orgRoutes from './routes/organizations.js';
 import crmRoutes from './routes/crm.js';
+import searchRoutes from './routes/search.js';
+import tagRoutes from './routes/tags.js';
+import aiRoutes from './routes/ai.js';
+import workflowRoutes from './routes/workflows.js';
+import insightRoutes from './routes/insights.js';
+import webhookRoutes from './routes/webhooks.js';
 
 async function startServer() {
   const app = express();
@@ -23,6 +29,12 @@ async function startServer() {
   app.use('/api/auth', authRoutes);
   app.use('/api/organizations', orgRoutes);
   app.use('/api/crm', crmRoutes);
+  app.use('/api/search', searchRoutes);
+  app.use('/api/tags', tagRoutes);
+  app.use('/api/ai-hub', aiRoutes);
+  app.use('/api/workflows', workflowRoutes);
+  app.use('/api/insights', insightRoutes);
+  app.use('/api/webhooks', webhookRoutes);
 
   // AI Gateway mock abstraction (to keep previous logic alive)
   app.post("/api/ai/chat", async (req, res) => {

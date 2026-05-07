@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useTenantStore } from '../store/useTenantStore';
 import { 
   BarChart, 
   Users, 
@@ -12,26 +13,74 @@ import {
   Menu,
   Briefcase,
   Sparkles,
-  Command
+  Command,
+  Building2,
+  Contact,
+  Calendar as CalendarIcon,
+  Workflow,
+  Blocks,
+  Lightbulb
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from './ui/sheet';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import { Input } from './ui/input';
+
+import { useNavigate } from 'react-router-dom';
+import { apiFetch } from '../lib/api';
+import { 
+  BarChart, Sparkles, Lightbulb, Building2, Contact, UserPlus, Target, 
+  CheckSquare, Calendar as CalendarIcon, FileText, Settings, Search, 
+  Menu, X, Workflow, Zap, Bot, Database, Briefcase, Blocks, LayoutDashboard,
+  HeartPulse, BookOpen, MessageSquare, BarChart3, FolderGit2
+} from 'lucide-react';
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: BarChart },
+  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'AI Center', href: '/ai-center', icon: Sparkles },
-  { name: 'Customers', href: '/customers', icon: Users },
-  { name: 'Leads', href: '/leads', icon: UserPlus },
+  { name: 'Insights', href: '/insights', icon: Lightbulb },
+  { name: 'Customer Success', href: '/success', icon: HeartPulse },
+  { name: 'Inbox', href: '/communication', icon: MessageSquare },
   { name: 'Pipeline', href: '/pipeline', icon: Target },
+  { name: 'Companies', href: '/companies', icon: Building2 },
+  { name: 'Contacts', href: '/contacts', icon: Contact },
+  { name: 'Leads', href: '/leads', icon: UserPlus },
+  { name: 'Workflows', href: '/workflows', icon: Workflow },
+  { name: 'Builder', href: '/workflow-builder', icon: FolderGit2 },
   { name: 'Tasks', href: '/tasks', icon: CheckSquare },
-  { name: 'Reports', href: '/reports', icon: FileText },
+  { name: 'Calendar', href: '/calendar', icon: CalendarIcon },
+  { name: 'Knowledge', href: '/knowledge', icon: BookOpen },
+  { name: 'Documents', href: '/documents', icon: FileText },
+  { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+  { name: 'Integrations', href: '/integrations', icon: Blocks },
 ];
 
 export default function Layout() {
   const { user, logOut } = useAuth();
+  const { currentTenantId } = useTenantStore();
   const [cmdOpen, setCmdOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const navigate = useNavigate();
+
+  const handleSearch = async (val: string) => {
+    setSearchQuery(val);
+    if (!val.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const { results } = await apiFetch(`/search?q=${encodeURIComponent(val)}`);
+      setSearchResults(results || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   // Quick listener for CMD+K to simulate command center
   React.useEffect(() => {
@@ -65,6 +114,10 @@ export default function Layout() {
       ))}
     </>
   );
+
+  if (!currentTenantId) {
+    return <CreateOrganizationScreen />;
+  }
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
@@ -175,6 +228,8 @@ export default function Layout() {
                 <Sparkles className="h-5 w-5 text-indigo-500 mr-3 shrink-0" />
                 <input 
                   autoFocus 
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
                   placeholder="Ask Aegix AI or search your CRM..." 
                   className="w-full bg-transparent border-none text-lg text-slate-900 focus:outline-none focus:ring-0 placeholder:text-slate-400"
                 />
@@ -182,20 +237,49 @@ export default function Layout() {
                   ESC
                 </kbd>
               </div>
-              <div className="p-2">
-                 <div className="px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Suggested Actions</div>
-                 <NavLink to="/ai-center" onClick={() => setCmdOpen(false)} className="w-full flex items-center px-3 py-3 hover:bg-slate-50 rounded-lg text-left text-sm text-slate-700 transition">
-                   <span className="bg-indigo-100 text-indigo-700 p-1.5 rounded mr-3"><FileText className="h-4 w-4" /></span>
-                   Draft a follow-up email to recently contacted leads
-                 </NavLink>
-                 <NavLink to="/ai-center" onClick={() => setCmdOpen(false)} className="w-full flex items-center px-3 py-3 hover:bg-slate-50 rounded-lg text-left text-sm text-slate-700 transition">
-                   <span className="bg-blue-100 text-blue-700 p-1.5 rounded mr-3"><Target className="h-4 w-4" /></span>
-                   Analyze my pipeline forecast for this month
-                 </NavLink>
-                 <NavLink to="/ai-center" onClick={() => setCmdOpen(false)} className="w-full flex items-center px-3 py-3 hover:bg-slate-50 rounded-lg text-left text-sm text-slate-700 transition">
-                   <span className="bg-emerald-100 text-emerald-700 p-1.5 rounded mr-3"><Users className="h-4 w-4" /></span>
-                   Find customers at risk of churn
-                 </NavLink>
+              <div className="p-2 max-h-96 overflow-y-auto">
+                 {searchQuery.trim() ? (
+                   isSearching ? (
+                     <div className="p-4 text-center text-sm text-slate-500">Searching...</div>
+                   ) : searchResults.length > 0 ? (
+                     <div className="space-y-1">
+                       {searchResults.map((result, idx) => (
+                         <div 
+                           key={`${result.type}-${result.id}-${idx}`}
+                           onClick={() => {
+                             setCmdOpen(false);
+                             navigate(result.url);
+                           }}
+                           className="w-full flex items-center justify-between px-3 py-3 hover:bg-slate-50 rounded-lg text-left cursor-pointer transition"
+                         >
+                           <div>
+                             <p className="text-sm font-medium text-slate-900">{result.label}</p>
+                             <p className="text-xs text-slate-500">{result.subLabel}</p>
+                           </div>
+                           <span className="text-xs font-medium px-2 py-1 bg-slate-100 text-slate-600 rounded capitalize">{result.type}</span>
+                         </div>
+                       ))}
+                     </div>
+                   ) : (
+                     <div className="p-4 text-center text-sm text-slate-500">No results found for "{searchQuery}"</div>
+                   )
+                 ) : (
+                   <>
+                     <div className="px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Suggested Actions</div>
+                     <NavLink to="/ai-center" onClick={() => setCmdOpen(false)} className="w-full flex items-center px-3 py-3 hover:bg-slate-50 rounded-lg text-left text-sm text-slate-700 transition">
+                       <span className="bg-indigo-100 text-indigo-700 p-1.5 rounded mr-3"><FileText className="h-4 w-4" /></span>
+                       Draft a follow-up email to recently contacted leads
+                     </NavLink>
+                     <NavLink to="/ai-center" onClick={() => setCmdOpen(false)} className="w-full flex items-center px-3 py-3 hover:bg-slate-50 rounded-lg text-left text-sm text-slate-700 transition">
+                       <span className="bg-blue-100 text-blue-700 p-1.5 rounded mr-3"><Target className="h-4 w-4" /></span>
+                       Analyze my pipeline forecast for this month
+                     </NavLink>
+                     <NavLink to="/ai-center" onClick={() => setCmdOpen(false)} className="w-full flex items-center px-3 py-3 hover:bg-slate-50 rounded-lg text-left text-sm text-slate-700 transition">
+                       <span className="bg-emerald-100 text-emerald-700 p-1.5 rounded mr-3"><Users className="h-4 w-4" /></span>
+                       Find companies at risk of churn
+                     </NavLink>
+                   </>
+                 )}
               </div>
             </div>
           </div>
@@ -223,5 +307,64 @@ function WorkflowIcon(props: any) {
       <path d="M7 11v4a2 2 0 0 0 2 2h4" />
       <rect width="8" height="8" x="13" y="13" rx="2" />
     </svg>
+  );
+}
+
+function CreateOrganizationScreen() {
+  const [name, setName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const { logOut } = useAuth();
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await fetch('/api/organizations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      if (res.ok) {
+        window.location.reload();
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Failed to create workspace');
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 font-sans p-4">
+      <div className="w-full max-w-md p-8 bg-white rounded-xl shadow-lg space-y-6">
+        <div className="text-center">
+           <div className="bg-indigo-600 w-16 h-16 flex items-center justify-center rounded-2xl shadow-sm mb-4 mx-auto text-white">
+              <WorkflowIcon className="w-8 h-8" />
+           </div>
+           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Create a Workspace</h1>
+           <p className="text-slate-500 mt-2 text-sm">You need an organization workspace to proceed.</p>
+        </div>
+
+        {error && <div className="p-3 bg-red-100 text-red-700 rounded-lg text-sm">{error}</div>}
+
+        <form onSubmit={handleCreate} className="space-y-4">
+          <div className="space-y-2">
+            <label htmlFor="orgName" className="text-sm font-medium leading-none">Organization Name</label>
+            <Input id="orgName" required value={name} onChange={e => setName(e.target.value)} />
+          </div>
+          <Button type="submit" disabled={loading} className="w-full h-11 bg-indigo-600 hover:bg-indigo-700">
+            {loading ? 'Creating...' : 'Create Workspace'}
+          </Button>
+        </form>
+
+        <div className="text-center text-sm pt-4 border-t border-slate-100">
+           <Button variant="ghost" onClick={logOut} className="text-slate-500">Sign Out</Button>
+        </div>
+      </div>
+    </div>
   );
 }

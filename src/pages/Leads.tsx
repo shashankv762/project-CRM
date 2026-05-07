@@ -12,6 +12,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Label } from '../components/ui/label';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/sheet';
 import { ActivityTimeline } from '../components/ActivityTimeline';
+import { NotesList } from '../components/NotesList';
+import { TagsBlock } from '../components/TagsBlock';
+
+import { AIToolkit } from '../components/AIToolkit';
 
 export default function Leads() {
   const { data: leads, loading } = useCRMData('leads');
@@ -290,7 +294,22 @@ export default function Leads() {
                    )}
                  </div>
                  
-                 <ActivityTimeline relatedId={selectedLead.id} relatedType="lead" />
+                 <div className="pt-4 border-t border-slate-100">
+                   <AIToolkit entityId={selectedLead.id} entityType="lead" />
+                 </div>
+
+                 <div className="pt-4 border-t border-slate-100">
+                   <TagsBlock entityId={selectedLead.id} entityType="lead" />
+                 </div>
+
+                 <div className="pt-4 border-t border-slate-100">
+                   <h3 className="text-sm font-semibold text-slate-900 border-b pb-2 mb-4">Activity History</h3>
+                   <ActivityTimeline relatedId={selectedLead.id} relatedType="lead" />
+                 </div>
+
+                 <div className="pt-4 border-t border-slate-100">
+                   <NotesList relatedId={selectedLead.id} relatedType="lead" />
+                 </div>
               </div>
             </div>
           )}

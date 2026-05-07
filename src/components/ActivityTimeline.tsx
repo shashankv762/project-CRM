@@ -9,7 +9,7 @@ import { Phone, Mail, Calendar, MessageSquare, Clock } from 'lucide-react';
 
 interface ActivityTimelineProps {
   relatedId: string;
-  relatedType: 'customer' | 'lead';
+  relatedType: 'company' | 'contact' | 'lead' | 'deal';
 }
 
 export function ActivityTimeline({ relatedId, relatedType }: ActivityTimelineProps) {

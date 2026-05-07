@@ -71,7 +71,7 @@ export default function Reports() {
             <div className="text-4xl font-bold text-green-600">
               {leads.length > 0 ? Math.round((leads.filter(l => l.status === 'converted').length / leads.length) * 100) : 0}%
             </div>
-            <p className="text-sm text-slate-500 mt-2">Leads converted to active customers</p>
+            <p className="text-sm text-slate-500 mt-2">Leads converted to active companies</p>
           </CardContent>
         </Card>
       </div>

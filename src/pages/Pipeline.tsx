@@ -10,6 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Label } from '../components/ui/label';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/sheet';
+import { ActivityTimeline } from '../components/ActivityTimeline';
+import { NotesList } from '../components/NotesList';
+import { TagsBlock } from '../components/TagsBlock';
+import { AIToolkit } from '../components/AIToolkit';
 
 const stages = [
   { id: 'prospect', title: 'Prospect' },
@@ -21,10 +26,11 @@ const stages = [
 
 export default function Pipeline() {
   const { data: deals, loading } = useCRMData('deals');
-  const { data: customers } = useCRMData('customers');
+  const { data: companies } = useCRMData('companies');
   
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [newDeal, setNewDeal] = useState({ title: '', customerId: '', value: '', stage: 'prospect', probability: '' });
+  const [newDeal, setNewDeal] = useState({ title: '', companyId: '', value: '', stage: 'prospect', probability: '' });
+  const [selectedDeal, setSelectedDeal] = useState<any>(null);
 
   const handleAddDeal = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,14 +39,14 @@ export default function Pipeline() {
         method: 'POST',
         body: JSON.stringify({
           title: newDeal.title,
-          customerId: newDeal.customerId,
+          companyId: newDeal.companyId,
           value: Number(newDeal.value) || 0,
           stage: newDeal.stage,
           probability: Number(newDeal.probability) || 0,
         })
       });
       setIsAddOpen(false);
-      setNewDeal({ title: '', customerId: '', value: '', stage: 'prospect', probability: '' });
+      setNewDeal({ title: '', companyId: '', value: '', stage: 'prospect', probability: '' });
       window.location.reload();
     } catch (error: any) {
       console.error("Failed to create deal:", error.message);
@@ -69,7 +75,7 @@ export default function Pipeline() {
     }
   };
 
-  const getCustomerName = (id: string) => customers.find(c => c.id === id)?.name || 'Unknown';
+  const getCompanyName = (id: string) => companies.find(c => c.id === id)?.name || 'Unknown';
 
   if (loading) {
     return <div className="flex h-full items-center justify-center">Loading pipeline...</div>;
@@ -93,11 +99,11 @@ export default function Pipeline() {
                 <Input id="title" required value={newDeal.title} onChange={e => setNewDeal({...newDeal, title: e.target.value})} />
               </div>
               <div className="space-y-2">
-                 <Label htmlFor="customer">Customer</Label>
-                 <Select value={newDeal.customerId} onValueChange={val => setNewDeal({...newDeal, customerId: val})}>
-                   <SelectTrigger id="customer"><SelectValue placeholder="Select Customer" /></SelectTrigger>
+                 <Label htmlFor="company">Company</Label>
+                 <Select value={newDeal.companyId} onValueChange={val => setNewDeal({...newDeal, companyId: val})}>
+                   <SelectTrigger id="company"><SelectValue placeholder="Select Company" /></SelectTrigger>
                    <SelectContent>
-                     {customers.map(c => (
+                     {companies.map(c => (
                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                      ))}
                    </SelectContent>
@@ -167,27 +173,29 @@ export default function Pipeline() {
                                   opacity: snapshot.isDragging ? 0.8 : 1
                                 }}
                               >
-                                <Card className="hover:shadow-md transition-shadow border-slate-200">
+                                <Card className="hover:shadow-md transition-shadow border-slate-200 cursor-pointer" onClick={() => setSelectedDeal(deal)}>
                                   <CardContent className="p-4 space-y-3">
                                     <div className="flex justify-between items-start">
                                       <p className="font-medium text-slate-900 leading-tight flex items-start gap-2">
                                         <GripVertical className="h-4 w-4 text-slate-400 mt-0.5 shrink-0 hover:text-slate-600" />
                                         {deal.title}
                                       </p>
-                                      <DropdownMenu>
-                                        <DropdownMenuTrigger render={<Button variant="ghost" className="h-6 w-6 p-0 -mt-1 -mr-2 text-slate-400 hover:text-slate-600" />}>
-                                          <MoreVertical className="h-4 w-4" />
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                          {stages.map(s => (
-                                            <DropdownMenuItem key={s.id} disabled={s.id === deal.stage} onClick={() => updateStage(deal.id, s.id)}>
-                                              Move to {s.title}
-                                            </DropdownMenuItem>
-                                          ))}
-                                        </DropdownMenuContent>
-                                      </DropdownMenu>
+                                      <div onClick={(e) => e.stopPropagation()}>
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger render={<Button variant="ghost" className="h-6 w-6 p-0 -mt-1 -mr-2 text-slate-400 hover:text-slate-600" />}>
+                                            <MoreVertical className="h-4 w-4" />
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="end">
+                                            {stages.map(s => (
+                                              <DropdownMenuItem key={s.id} disabled={s.id === deal.stage} onClick={() => updateStage(deal.id, s.id)}>
+                                                Move to {s.title}
+                                              </DropdownMenuItem>
+                                            ))}
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
+                                      </div>
                                     </div>
-                                    <p className="text-xs text-slate-500 ml-6">{getCustomerName(deal.customerId)}</p>
+                                    <p className="text-xs text-slate-500 ml-6">{getCompanyName(deal.companyId)}</p>
                                     <div className="flex items-center justify-between pt-2 border-t border-slate-100 ml-6">
                                       <div className="flex items-center text-sm font-semibold text-slate-700">
                                         <DollarSign className="h-3 w-3 mr-0.5 text-slate-400" />
@@ -215,6 +223,47 @@ export default function Pipeline() {
           </div>
         </DragDropContext>
       </div>
+
+      <Sheet open={!!selectedDeal} onOpenChange={(open) => !open && setSelectedDeal(null)}>
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+          {selectedDeal && (
+            <div className="space-y-6 pb-6">
+              <SheetHeader>
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700">
+                     <DollarSign className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <SheetTitle className="text-xl flex items-center gap-2">
+                       {selectedDeal.title}
+                    </SheetTitle>
+                    <p className="text-sm text-slate-500">
+                       {getCompanyName(selectedDeal.companyId)} • ${Number(selectedDeal.value).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              </SheetHeader>
+              
+              <div className="space-y-4">
+                 <AIToolkit entityId={selectedDeal.id} entityType="deal" />
+
+                 <div className="pt-4 border-t border-slate-100">
+                   <TagsBlock entityId={selectedDeal.id} entityType="deal" />
+                 </div>
+
+                 <div className="pt-4 border-t border-slate-100">
+                   <h3 className="text-sm font-semibold text-slate-900 border-b pb-2 mb-4">Activity History</h3>
+                   <ActivityTimeline relatedId={selectedDeal.id} relatedType="deal" />
+                 </div>
+
+                 <div className="pt-4 border-t border-slate-100">
+                   <NotesList relatedId={selectedDeal.id} relatedType="deal" />
+                 </div>
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

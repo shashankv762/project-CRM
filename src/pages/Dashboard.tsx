@@ -4,12 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { Users, Target, CheckSquare, DollarSign, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { GlobalActivityFeed } from '../components/GlobalActivityFeed';
 
 export default function Dashboard() {
   const { data: deals, loading: dealsLoading } = useCRMData('deals');
   const { data: leads, loading: leadsLoading } = useCRMData('leads');
   const { data: tasks, loading: tasksLoading } = useCRMData('tasks');
-  const { data: customers, loading: customersLoading } = useCRMData('customers');
+  const { data: companies, loading: companiesLoading } = useCRMData('companies');
 
   const pendingTasks = tasks.filter(t => t.status === 'pending');
   const wonDeals = deals.filter(d => d.stage === 'closed_won');
@@ -26,7 +27,7 @@ export default function Dashboard() {
     };
   });
 
-  const loading = dealsLoading || leadsLoading || tasksLoading || customersLoading;
+  const loading = dealsLoading || leadsLoading || tasksLoading || companiesLoading;
 
   if (loading) {
     return <div className="flex h-full items-center justify-center">Loading dashboard...</div>;
@@ -89,11 +90,11 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">Total Customers</CardTitle>
+            <CardTitle className="text-sm font-medium text-slate-600">Total Companies</CardTitle>
             <Users className="h-4 w-4 text-slate-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{customers.length}</div>
+            <div className="text-2xl font-bold">{companies.length}</div>
             <p className="text-xs text-slate-500">Active accounts</p>
           </CardContent>
         </Card>
@@ -135,27 +136,11 @@ export default function Dashboard() {
 
         <Card className="lg:col-span-3">
           <CardHeader>
-            <CardTitle>Upcoming Tasks</CardTitle>
+            <CardTitle>Recent Activity</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {pendingTasks.slice(0, 5).length === 0 ? (
-                <p className="text-sm text-slate-500 text-center py-4">No pending tasks</p>
-              ) : (
-                pendingTasks.slice(0, 5).map(task => (
-                  <div key={task.id} className="flex items-center space-x-4">
-                    <div className="bg-blue-50 p-2 rounded-full">
-                      <CheckSquare className="h-4 w-4 text-blue-600" />
-                    </div>
-                    <div className="flex-1 space-y-1">
-                      <p className="text-sm font-medium leading-none">{task.title}</p>
-                      <p className="text-xs text-slate-500">
-                        Due {new Date(task.dueDate).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              )}
+              <GlobalActivityFeed />
             </div>
           </CardContent>
         </Card>

@@ -4,7 +4,7 @@ import { apiFetch } from '../lib/api';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Plus, CheckCircle2, Clock, Phone, Mail, Calendar, Target } from 'lucide-react';
+import { Plus, CheckCircle2, Clock, Phone, Mail, Calendar, Target, Building2, User, UserPlus } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Label } from '../components/ui/label';
@@ -12,25 +12,34 @@ import { Checkbox } from '../components/ui/checkbox';
 
 export default function Tasks() {
   const { data: tasks, loading } = useCRMData('tasks');
+  const { data: deals } = useCRMData('deals');
+  const { data: contacts } = useCRMData('contacts');
+  const { data: companies } = useCRMData('companies');
+  const { data: leads } = useCRMData('leads');
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [newTask, setNewTask] = useState({ title: '', description: '', dueDate: '', type: 'todo' });
+  const [newTask, setNewTask] = useState({ title: '', description: '', dueDate: '', type: 'todo', relatedType: 'none', relatedId: 'none' });
 
   const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const payload: any = {
+        title: newTask.title,
+        description: newTask.description,
+        type: newTask.type,
+        dueDate: newTask.dueDate ? new Date(newTask.dueDate).getTime() : Date.now(),
+        status: 'pending'
+      };
+
+      if (newTask.relatedType !== 'none' && newTask.relatedId !== 'none') {
+        payload[`${newTask.relatedType}Id`] = newTask.relatedId;
+      }
+
       await apiFetch('/crm/tasks', {
         method: 'POST',
-        body: JSON.stringify({
-          title: newTask.title,
-          description: newTask.description,
-          type: newTask.type,
-          dueDate: newTask.dueDate ? new Date(newTask.dueDate).getTime() : Date.now(),
-          status: 'pending'
-        })
+        body: JSON.stringify(payload)
       });
       setIsAddOpen(false);
-      setNewTask({ title: '', description: '', dueDate: '', type: 'todo' });
-      // In a real app we'd mutate SWR or React Query here, or trigger a re-fetch
+      setNewTask({ title: '', description: '', dueDate: '', type: 'todo', relatedType: 'none', relatedId: 'none' });
       window.location.reload(); 
     } catch (error: any) {
        console.error("Failed to create task:", error.message);
@@ -120,6 +129,34 @@ export default function Tasks() {
                 <Label htmlFor="dueDate">Due Date</Label>
                 <Input id="dueDate" type="date" required value={newTask.dueDate} onChange={e => setNewTask({...newTask, dueDate: e.target.value})} />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="relatedType">Related To</Label>
+                <Select value={newTask.relatedType} onValueChange={val => setNewTask({...newTask, relatedType: val, relatedId: 'none'})}>
+                  <SelectTrigger id="relatedType"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    <SelectItem value="deal">Deal</SelectItem>
+                    <SelectItem value="contact">Contact</SelectItem>
+                    <SelectItem value="company">Company</SelectItem>
+                    <SelectItem value="lead">Lead</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {newTask.relatedType !== 'none' && (
+                <div className="space-y-2">
+                  <Label htmlFor="relatedId">Select {newTask.relatedType}</Label>
+                  <Select value={newTask.relatedId} onValueChange={val => setNewTask({...newTask, relatedId: val})}>
+                    <SelectTrigger id="relatedId"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Select...</SelectItem>
+                      {newTask.relatedType === 'deal' && deals.map((d: any) => <SelectItem key={d.id} value={d.id}>{d.title}</SelectItem>)}
+                      {newTask.relatedType === 'contact' && contacts.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.firstName} {c.lastName}</SelectItem>)}
+                      {newTask.relatedType === 'company' && companies.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                      {newTask.relatedType === 'lead' && leads.map((l: any) => <SelectItem key={l.id} value={l.id}>{l.name} {l.lastName}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <Button type="submit" className="w-full">Save Task</Button>
             </form>
           </DialogContent>

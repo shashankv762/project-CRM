@@ -43,7 +43,7 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
 });
 
 // Organization Context details (Needs X-Tenant-Id)
-router.get('/context', requireTenant, async (req: TenantRequest, res) => {
+router.get('/context', requireAuth, requireTenant, async (req: TenantRequest, res) => {
   try {
     const org = await prisma.organization.findUnique({
       where: { id: req.tenantId },

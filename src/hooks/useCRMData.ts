@@ -1,30 +1,39 @@
 import { useEffect, useState } from 'react';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { useAuth } from '../contexts/AuthContext';
+import { apiFetch } from '../lib/api';
+import { useAuthStore } from '../store/useAuthStore';
+import { useTenantStore } from '../store/useTenantStore';
 
 export function useCRMData(collectionName: string) {
-  const { user } = useAuth();
+  const { user } = useAuthStore();
+  const { currentTenantId } = useTenantStore();
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !currentTenantId) return;
     
-    setLoading(true);
-    const q = query(collection(db, collectionName), where('ownerId', '==', user.uid));
+    let isMounted = true;
     
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setData(results);
-      setLoading(false);
-    }, (error) => {
-      setLoading(false);
-      handleFirestoreError(error, OperationType.LIST, collectionName);
-    });
+    async function fetchData() {
+      setLoading(true);
+      try {
+        const results = await apiFetch(`/crm/${collectionName}`);
+        if (isMounted) {
+          setData(results);
+        }
+      } catch (err) {
+        console.error("Failed to fetch CRM data", err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+    
+    fetchData();
 
-    return () => unsubscribe();
-  }, [user, collectionName]);
+    return () => {
+      isMounted = false;
+    };
+  }, [user, currentTenantId, collectionName]);
 
   return { data, loading };
 }

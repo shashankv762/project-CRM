@@ -1,0 +1,342 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------
+// 1. TENANT & USER MANAGEMENT
+// ---------------------------------------------------------------------
+
+model User {
+  id              String   @id @default(uuid())
+  email           String   @unique
+  passwordHash    String
+  firstName       String?
+  lastName        String?
+  avatarUrl       String?
+  isActive        Boolean  @default(true)
+  timezone        String?  @default("UTC")
+  language        String?  @default("en")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  memberships     OrganizationMember[]
+  ownedOrgs       Organization[]       @relation("OrgOwner")
+  activities      ActivityLog[]
+  auditLogs       AuditLog[]
+  assignedTasks   Task[]               @relation("TaskAssignee")
+  notifications   Notification[]
+}
+
+model Organization {
+  id              String   @id @default(uuid())
+  name            String
+  slug            String   @unique
+  logoUrl         String?
+  ownerId         String
+  owner           User     @relation("OrgOwner", fields: [ownerId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Tenant Isolation References
+  members         OrganizationMember[]
+  teams           Team[]
+  roles           Role[]
+  subscription    Subscription?
+  settings        OrganizationSettings?
+  auditLogs       AuditLog[]
+  activities      ActivityLog[]
+  contacts        Contact[]
+  deals           Deal[]
+  tasks           Task[]
+  apiKeys         ApiKey[]
+  customers       Customer[]
+  leads           Lead[]
+}
+
+model OrganizationMember {
+  id              String       @id @default(uuid())
+  userId          String
+  organizationId  String
+  roleId          String
+  
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  role            Role         @relation(fields: [roleId], references: [id])
+  
+  teamId          String?
+  team            Team?        @relation(fields: [teamId], references: [id])
+  
+  joinedAt        DateTime     @default(now())
+  
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------
+// 2. RBAC & PERMISSIONS
+// ---------------------------------------------------------------------
+
+model Role {
+  id              String               @id @default(uuid())
+  name            String               // e.g., "Admin", "Sales Manager", "Rep"
+  description     String?
+  isSystem        Boolean              @default(false)
+  organizationId  String
+  organization    Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  permissions     Permission[]
+  members         OrganizationMember[]
+
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@unique([name, organizationId])
+}
+
+model Permission {
+  id              String   @id @default(uuid())
+  action          String   // e.g., "read:deals", "write:contacts"
+  roleId          String
+  role            Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([action, roleId])
+}
+
+model Team {
+  id              String               @id @default(uuid())
+  name            String
+  description     String?
+  organizationId  String
+  organization    Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  managerId       String?              // Can refer to an OrganizationMember id
+  members         OrganizationMember[]
+
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+}
+
+// ---------------------------------------------------------------------
+// 3. SAAS INFRASTRUCTURE & SETTINGS
+// ---------------------------------------------------------------------
+
+model Subscription {
+  id              String       @id @default(uuid())
+  organizationId  String       @unique
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  planTier        String       @default("FREE") // FREE, PRO, ENTERPRISE
+  status          String       @default("ACTIVE") // ACTIVE, CANCELED, PAST_DUE
+  stripeCustomerId String?
+  stripeSubId     String?
+  billingCycle    String       @default("MONTHLY") // MONTHLY, YEARLY
+  seatLimit       Int          @default(5)
+  features        String       // JSON string of enabled features
+
+  currentPeriodStart DateTime  @default(now())
+  currentPeriodEnd   DateTime  @default(now())
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+model OrganizationSettings {
+  id              String       @id @default(uuid())
+  organizationId  String       @unique
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  timezone        String       @default("UTC")
+  dateFormat      String       @default("YYYY-MM-DD")
+  currency        String       @default("USD")
+  brandingColor   String       @default("#4f46e5")
+  aiEnabled       Boolean      @default(true)
+  
+  updatedAt       DateTime     @updatedAt
+}
+
+model ApiKey {
+  id              String       @id @default(uuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  name            String
+  keyHash         String       @unique
+  lastUsedAt      DateTime?
+  expiresAt       DateTime?
+  
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([organizationId])
+}
+
+// ---------------------------------------------------------------------
+// 4. AUDIT & ACTIVITY & NOTIFICATIONS
+// ---------------------------------------------------------------------
+
+model AuditLog {
+  id              String       @id @default(uuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId          String?
+  user            User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  action          String       // e.g., "user.invited", "deal.deleted"
+  resourceType    String
+  resourceId      String
+  ipAddress       String?
+  userAgent       String?
+  details         String?      // JSON payload of changes
+
+  createdAt       DateTime     @default(now())
+
+  @@index([organizationId])
+  @@index([createdAt])
+}
+
+model ActivityLog {
+  id              String       @id @default(uuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId          String?
+  user            User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  type            String       // e.g., "note", "call", "email"
+  entityType      String       // e.g., "deal", "contact"
+  entityId        String
+  content         String
+  metadata        String?      // JSON
+
+  createdAt       DateTime     @default(now())
+
+  @@index([organizationId])
+  @@index([entityType, entityId])
+}
+
+model Notification {
+  id              String       @id @default(uuid())
+  userId          String
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title           String
+  message         String
+  type            String       // alert, mention, system
+  read            Boolean      @default(false)
+  actionUrl       String?
+
+  createdAt       DateTime     @default(now())
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------
+// 5. CORE CRM DOMAIN
+// ---------------------------------------------------------------------
+
+model Customer {
+  id              String       @id @default(uuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name            String
+  email           String?
+  phone           String?
+  company         String?
+  status          String       @default("active")
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+model Lead {
+  id              String       @id @default(uuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name            String
+  email           String?
+  phone           String?
+  company         String?
+  source          String?
+  status          String       @default("new")
+  lastContacted   DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+model Contact {
+  id              String       @id @default(uuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  firstName       String
+  lastName        String
+  email           String?
+  phone           String?
+  companyName     String?
+  jobTitle        String?
+  
+  healthScore     Int?         // AI calculated
+  churnRisk       String?      // LOW, MEDIUM, HIGH (AI calculated)
+  
+  deals           Deal[]       @relation("ContactDeals")
+  
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([organizationId])
+}
+
+model Deal {
+  id              String       @id @default(uuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  title           String
+  value           Float        @default(0)
+  stage           String       @default("prospect") // prospect, negotiation, won, lost
+  probability     Int?         // AI calculated
+  
+  contacts        Contact[]    @relation("ContactDeals")
+  tasks           Task[]       @relation("DealTasks")
+
+  expectedCloseAt DateTime?
+  closedAt        DateTime?
+  
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([organizationId])
+}
+
+model Task {
+  id              String       @id @default(uuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  title           String
+  description     String?
+  status          String       @default("pending") // pending, in_progress, completed
+  priority        String       @default("medium") // low, medium, high
+  
+  dueDate         DateTime?
+  
+  assigneeId      String?
+  assignee        User?        @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  dealId          String?
+  deal            Deal?        @relation("DealTasks", fields: [dealId], references: [id], onDelete: SetNull)
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([organizationId])
+  @@index([assigneeId])
+}

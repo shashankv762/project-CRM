@@ -1,73 +1,60 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
-import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import React, { createContext, useContext, useEffect } from 'react';
+import { useAuthStore } from '../store/useAuthStore';
+import { useTenantStore } from '../store/useTenantStore';
 
 interface AuthContextType {
-  user: User | null;
-  loading: boolean;
-  signIn: () => Promise<void>;
   logOut: () => Promise<void>;
+  user: any; // mapping to old firebase user for backwards compatibility during transition
 }
 
-const AuthContext = createContext<AuthContextType>({} as AuthContextType);
+const AuthContext = createContext<AuthContextType>({ logOut: async () => {}, user: null });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, setUser, setLoading, logout: zustandLogout } = useAuthStore();
+  const { setUserTenants, setTenantInfo } = useTenantStore();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
-        // Ensure user profile exists in db
-        try {
-          const userRef = doc(db, 'users', currentUser.uid);
-          const userSnap = await getDoc(userRef);
-          if (!userSnap.exists()) {
-            await setDoc(userRef, {
-              email: currentUser.email,
-              name: currentUser.displayName || 'User',
-              role: 'rep',
-              createdAt: Date.now()
-            });
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+          const data = await res.json();
+          setUser(data.user);
+          
+          if (data.user.memberships && data.user.memberships.length > 0) {
+            setUserTenants(data.user.memberships);
+            const firstOrg = data.user.memberships[0];
+            setTenantInfo(firstOrg.organizationId, firstOrg.organization, firstOrg.role.name);
           }
-        } catch (error) {
-          console.error("Error setting up user profile", error);
+        } else {
+          setUser(null);
         }
-      } else {
+      } catch (err) {
         setUser(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    });
-
-    return unsubscribe;
-  }, []);
-
-  const signIn = async () => {
-    const provider = new GoogleAuthProvider();
-    // Scope for basic profile is already requested by default, if we wanted real Gmail/GCal API
-    // we would add them here, but Google Sign-In with Firebase Auth only retrieves an OAuth token
-    // on sign-in, which must be immediately sent to a backend or used.
-    // We will simulate the internal tracking of those without full OAuth tokens for simple usage,
-    // or we can request calendar/gmail scope for future integration possibilities.
-    provider.addScope('https://www.googleapis.com/auth/calendar.readonly');
-    provider.addScope('https://www.googleapis.com/auth/gmail.readonly');
-    
-    try {
-      await signInWithPopup(auth, provider);
-    } catch (error) {
-      console.error('Sign-in error', error);
     }
-  };
+    checkAuth();
+  }, [setUser, setLoading, setUserTenants, setTenantInfo]);
 
   const logOut = async () => {
-    await signOut(auth);
+    await fetch('/api/auth/logout', { method: 'POST' });
+    zustandLogout();
+    useTenantStore.getState().clearTenant();
   };
 
+  // Map to old firebase format for smooth transition without breaking everything at once
+  const mappedUser = user ? {
+    uid: user.id,
+    email: user.email,
+    displayName: user.firstName ? `${user.firstName} ${user.lastName || ''}` : user.email,
+    photoURL: user.avatarUrl,
+  } : null;
+
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, logOut }}>
-      {!loading && children}
+    <AuthContext.Provider value={{ logOut, user: mappedUser }}>
+      {children}
     </AuthContext.Provider>
   );
 }

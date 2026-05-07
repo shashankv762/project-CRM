@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { useCRMData } from '../hooks/useCRMData';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, doc, setDoc, updateDoc } from 'firebase/firestore';
-import { useAuth } from '../contexts/AuthContext';
+import { apiFetch } from '../lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Button } from '../components/ui/button';
@@ -17,7 +15,6 @@ import { ActivityTimeline } from '../components/ActivityTimeline';
 
 export default function Leads() {
   const { data: leads, loading } = useCRMData('leads');
-  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newLead, setNewLead] = useState({ name: '', email: '', phone: '', company: '', source: '', status: 'new' });
@@ -32,37 +29,45 @@ export default function Leads() {
 
   const handleAddLead = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
-    
     try {
-      const docRef = doc(collection(db, 'leads'));
       const leadData: any = {
-        ...newLead,
-        ownerId: user.uid,
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+        name: newLead.name,
+        status: newLead.status,
       };
+      
+      if (newLead.email.trim()) leadData.email = newLead.email.trim();
+      if (newLead.phone.trim()) leadData.phone = newLead.phone.trim();
+      if (newLead.company.trim()) leadData.company = newLead.company.trim();
+      if (newLead.source.trim()) leadData.source = newLead.source.trim();
+      
       if (newLead.status === 'contacted') {
         leadData.lastContacted = Date.now();
       }
-      await setDoc(docRef, leadData);
+      await apiFetch('/crm/leads', {
+        method: 'POST',
+        body: JSON.stringify(leadData)
+      });
       setIsAddOpen(false);
       setNewLead({ name: '', email: '', phone: '', company: '', source: '', status: 'new' });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, 'leads');
+      window.location.reload();
+    } catch (error: any) {
+      console.error("Failed to crate lead:", error.message);
     }
   };
 
   const updateLeadStatus = async (leadId: string, status: string) => {
-    if (!user) return;
     try {
-      const updates: any = { status, updatedAt: Date.now() };
+      const updates: any = { status };
       if (status === 'contacted') {
         updates.lastContacted = Date.now();
       }
-      await updateDoc(doc(db, 'leads', leadId), updates);
-    } catch (error) {
-       handleFirestoreError(error, OperationType.UPDATE, 'leads');
+      await apiFetch(`/crm/leads/${leadId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updates)
+      });
+      window.location.reload();
+    } catch (error: any) {
+       console.error("Failed to update lead:", error.message);
     }
   };
 

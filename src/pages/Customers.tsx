@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { useCRMData } from '../hooks/useCRMData';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, doc, setDoc } from 'firebase/firestore';
-import { useAuth } from '../contexts/AuthContext';
+import { apiFetch } from '../lib/api';
 import { Card, CardContent, CardHeader } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Button } from '../components/ui/button';
@@ -15,7 +13,6 @@ import { ActivityTimeline } from '../components/ActivityTimeline';
 
 export default function Customers() {
   const { data: customers, loading } = useCRMData('customers');
-  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newCustomer, setNewCustomer] = useState({ name: '', email: '', phone: '', company: '' });
@@ -30,21 +27,25 @@ export default function Customers() {
 
   const handleAddCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
-    
     try {
-      const docRef = doc(collection(db, 'customers'));
-      await setDoc(docRef, {
-        ...newCustomer,
+      const customerData: any = {
+        name: newCustomer.name,
         status: 'active',
-        ownerId: user.uid,
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+      };
+
+      if (newCustomer.email.trim()) customerData.email = newCustomer.email.trim();
+      if (newCustomer.phone.trim()) customerData.phone = newCustomer.phone.trim();
+      if (newCustomer.company.trim()) customerData.company = newCustomer.company.trim();
+
+      await apiFetch('/crm/customers', {
+        method: 'POST',
+        body: JSON.stringify(customerData)
       });
       setIsAddOpen(false);
       setNewCustomer({ name: '', email: '', phone: '', company: '' });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, 'customers');
+      window.location.reload();
+    } catch (error: any) {
+      console.error("Failed to create customer:", error.message);
     }
   };
 

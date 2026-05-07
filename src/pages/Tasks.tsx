@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { useCRMData } from '../hooks/useCRMData';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, doc, setDoc, updateDoc } from 'firebase/firestore';
-import { useAuth } from '../contexts/AuthContext';
+import { apiFetch } from '../lib/api';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -14,40 +12,63 @@ import { Checkbox } from '../components/ui/checkbox';
 
 export default function Tasks() {
   const { data: tasks, loading } = useCRMData('tasks');
-  const { user } = useAuth();
-  
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newTask, setNewTask] = useState({ title: '', description: '', dueDate: '', type: 'todo' });
 
   const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
-    
     try {
-      await setDoc(doc(collection(db, 'tasks')), {
-        title: newTask.title,
-        description: newTask.description,
-        type: newTask.type,
-        dueDate: newTask.dueDate ? new Date(newTask.dueDate).getTime() : Date.now(),
-        status: 'pending',
-        ownerId: user.uid,
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+      await apiFetch('/crm/tasks', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: newTask.title,
+          description: newTask.description,
+          type: newTask.type,
+          dueDate: newTask.dueDate ? new Date(newTask.dueDate).getTime() : Date.now(),
+          status: 'pending'
+        })
       });
       setIsAddOpen(false);
       setNewTask({ title: '', description: '', dueDate: '', type: 'todo' });
-    } catch (error) {
-       handleFirestoreError(error, OperationType.CREATE, 'tasks');
+      // In a real app we'd mutate SWR or React Query here, or trigger a re-fetch
+      window.location.reload(); 
+    } catch (error: any) {
+       console.error("Failed to create task:", error.message);
     }
   };
 
   const toggleTaskStatus = async (taskId: string, currentStatus: string) => {
     try {
       const newStatus = currentStatus === 'pending' ? 'completed' : 'pending';
-      await updateDoc(doc(db, 'tasks', taskId), { status: newStatus, updatedAt: Date.now() });
-    } catch (error) {
-       handleFirestoreError(error, OperationType.UPDATE, 'tasks');
+      await apiFetch(`/crm/tasks/${taskId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: newStatus })
+      });
+      window.location.reload();
+    } catch (error: any) {
+       console.error("Failed to update task:", error.message);
     }
+  };
+
+  const handleUpdateDueDate = async (taskId: string, newDueDateString: string) => {
+    if (!newDueDateString) return;
+    try {
+      await apiFetch(`/crm/tasks/${taskId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ dueDate: new Date(newDueDateString).getTime() })
+      });
+      // Optionally reload or state update
+    } catch (error: any) {
+       console.error("Failed to update due date:", error.message);
+    }
+  };
+
+  const formatForDateInput = (timestamp: number) => {
+    const d = new Date(timestamp);
+    const yr = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, '0');
+    const da = String(d.getDate()).padStart(2, '0');
+    return `${yr}-${mo}-${da}`;
   };
 
   const getTaskIcon = (type: string) => {
@@ -128,7 +149,15 @@ export default function Tasks() {
                            {getTaskIcon(task.type)}
                            <span className="capitalize">{task.type}</span>
                          </span>
-                         <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
+                         <span className="flex items-center gap-1">
+                           <span>Due:</span>
+                           <Input 
+                             type="date"
+                             className="h-6 text-xs px-2 py-0 border-transparent hover:border-slate-200 w-[110px] bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-slate-300"
+                             value={formatForDateInput(task.dueDate)}
+                             onChange={(e) => handleUpdateDueDate(task.id, e.target.value)}
+                           />
+                         </span>
                        </div>
                     </div>
                   </CardContent>

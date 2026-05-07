@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { useCRMData } from '../hooks/useCRMData';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, doc, setDoc, updateDoc } from 'firebase/firestore';
-import { useAuth } from '../contexts/AuthContext';
+import { apiFetch } from '../lib/api';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -24,39 +22,40 @@ const stages = [
 export default function Pipeline() {
   const { data: deals, loading } = useCRMData('deals');
   const { data: customers } = useCRMData('customers');
-  const { user } = useAuth();
   
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newDeal, setNewDeal] = useState({ title: '', customerId: '', value: '', stage: 'prospect', probability: '' });
 
   const handleAddDeal = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
-    
     try {
-      const docRef = doc(collection(db, 'deals'));
-      await setDoc(docRef, {
-        title: newDeal.title,
-        customerId: newDeal.customerId,
-        value: Number(newDeal.value) || 0,
-        stage: newDeal.stage,
-        probability: Number(newDeal.probability) || 0,
-        ownerId: user.uid,
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+      await apiFetch('/crm/deals', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: newDeal.title,
+          customerId: newDeal.customerId,
+          value: Number(newDeal.value) || 0,
+          stage: newDeal.stage,
+          probability: Number(newDeal.probability) || 0,
+        })
       });
       setIsAddOpen(false);
       setNewDeal({ title: '', customerId: '', value: '', stage: 'prospect', probability: '' });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, 'deals');
+      window.location.reload();
+    } catch (error: any) {
+      console.error("Failed to create deal:", error.message);
     }
   };
 
   const updateStage = async (dealId: string, stage: string) => {
     try {
-      await updateDoc(doc(db, 'deals', dealId), { stage, updatedAt: Date.now() });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, 'deals');
+      await apiFetch(`/crm/deals/${dealId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ stage })
+      });
+      window.location.reload();
+    } catch (error: any) {
+      console.error("Failed to update deal:", error.message);
     }
   };
 

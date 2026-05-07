@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { useCRMData } from '../hooks/useCRMData';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, doc, setDoc } from 'firebase/firestore';
-import { useAuth } from '../contexts/AuthContext';
+import { apiFetch } from '../lib/api';
+import { useAuthStore } from '../store/useAuthStore';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -15,13 +14,13 @@ interface ActivityTimelineProps {
 
 export function ActivityTimeline({ relatedId, relatedType }: ActivityTimelineProps) {
   const { data: activities, loading } = useCRMData('activities');
-  const { user } = useAuth();
+  const { user } = useAuthStore();
   
   const [newActivity, setNewActivity] = useState({ type: 'note', summary: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const filteredActivities = activities
-    .filter(a => a.relatedId === relatedId && a.relatedType === relatedType)
+    .filter(a => a.entityId === relatedId && a.entityType === relatedType)
     .sort((a, b) => b.createdAt - a.createdAt);
 
   const handleAddActivity = async (e: React.FormEvent) => {
@@ -30,18 +29,20 @@ export function ActivityTimeline({ relatedId, relatedType }: ActivityTimelinePro
     
     setIsSubmitting(true);
     try {
-      const docRef = doc(collection(db, 'activities'));
-      await setDoc(docRef, {
-        type: newActivity.type,
-        summary: newActivity.summary,
-        relatedId,
-        relatedType,
-        ownerId: user.uid,
-        createdAt: Date.now()
+      await apiFetch('/crm/activities', {
+        method: 'POST',
+        body: JSON.stringify({
+          type: newActivity.type,
+          content: newActivity.summary,
+          entityId: relatedId,
+          entityType: relatedType,
+        })
       });
       setNewActivity({ type: 'note', summary: '' });
-    } catch (error) {
-       handleFirestoreError(error, OperationType.CREATE, 'activities');
+      // mutate in real app
+      window.location.reload();
+    } catch (error: any) {
+       console.error("Failed to log activity:", error.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -108,7 +109,7 @@ export function ActivityTimeline({ relatedId, relatedType }: ActivityTimelinePro
                        {new Date(activity.createdAt).toLocaleString()}
                      </span>
                    </div>
-                   <p className="text-sm text-slate-600 whitespace-pre-wrap">{activity.summary}</p>
+                   <p className="text-sm text-slate-600 whitespace-pre-wrap">{activity.content}</p>
                 </div>
               </div>
             ))}
